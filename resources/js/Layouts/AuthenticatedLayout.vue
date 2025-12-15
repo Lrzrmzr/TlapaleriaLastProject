@@ -1,13 +1,32 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import ApplicationLogo from '@/Components/ApplicationLogo.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage, router } from '@inertiajs/vue3';
+import { useAuth } from '@/composables/useAuth';
 
 const showingNavigationDropdown = ref(false);
+const page = usePage();
+const { user: authUser, logout, hasRole } = useAuth();
+
+// Get user from OAuth token or fallback to Inertia props
+const currentUser = computed(() => {
+    return authUser.value || page.props.auth?.user;
+});
+
+// Check if user is root
+const isRoot = computed(() => {
+    return hasRole('root');
+});
+
+// Handle logout with OAuth 2.0
+const handleLogout = async () => {
+    await logout();
+    // Redirect will be handled by useAuth composable
+};
 </script>
 
 <template>
@@ -46,6 +65,18 @@ const showingNavigationDropdown = ref(false);
                                     Ventas
                                 </NavLink>
                                 <NavLink
+                                    :href="route('proveedores.index')"
+                                    :active="route().current('proveedores.*')"
+                                >
+                                    Proveedores
+                                </NavLink>
+                                <NavLink
+                                    :href="route('productos.index')"
+                                    :active="route().current('productos.*')"
+                                >
+                                    Productos
+                                </NavLink>
+                                <NavLink
                                     :href="route('inventario.index')"
                                     :active="route().current('inventario.*')"
                                 >
@@ -63,6 +94,13 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     Usuarios
                                 </NavLink>
+                                <NavLink
+                                    v-if="isRoot"
+                                    :href="route('settings.index')"
+                                    :active="route().current('settings.*')"
+                                >
+                                    Configuración
+                                </NavLink>
                             </div>
                         </div>
 
@@ -76,7 +114,7 @@ const showingNavigationDropdown = ref(false);
                                                 type="button"
                                                 class="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none dark:bg-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
                                             >
-                                                {{ $page.props.auth.user.name }}
+                                                {{ currentUser?.name }}
 
                                                 <svg
                                                     class="-me-0.5 ms-2 h-4 w-4"
@@ -100,13 +138,12 @@ const showingNavigationDropdown = ref(false);
                                         >
                                             Profile
                                         </DropdownLink>
-                                        <DropdownLink
-                                            :href="route('logout')"
-                                            method="post"
-                                            as="button"
+                                        <button
+                                            @click="handleLogout"
+                                            class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none dark:text-gray-300 dark:hover:bg-gray-800 dark:focus:bg-gray-800"
                                         >
                                             Log Out
-                                        </DropdownLink>
+                                        </button>
                                     </template>
                                 </Dropdown>
                             </div>
@@ -177,6 +214,18 @@ const showingNavigationDropdown = ref(false);
                             Ventas
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
+                            :href="route('proveedores.index')"
+                            :active="route().current('proveedores.*')"
+                        >
+                            Proveedores
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            :href="route('productos.index')"
+                            :active="route().current('productos.*')"
+                        >
+                            Productos
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
                             :href="route('inventario.index')"
                             :active="route().current('inventario.*')"
                         >
@@ -194,6 +243,13 @@ const showingNavigationDropdown = ref(false);
                         >
                             Usuarios
                         </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="isRoot"
+                            :href="route('settings.index')"
+                            :active="route().current('settings.*')"
+                        >
+                            Configuración
+                        </ResponsiveNavLink>
                     </div>
 
                     <!-- Responsive Settings Options -->
@@ -204,10 +260,10 @@ const showingNavigationDropdown = ref(false);
                             <div
                                 class="text-base font-medium text-gray-800 dark:text-gray-200"
                             >
-                                {{ $page.props.auth.user.name }}
+                                {{ currentUser?.name }}
                             </div>
                             <div class="text-sm font-medium text-gray-500">
-                                {{ $page.props.auth.user.email }}
+                                {{ currentUser?.email }}
                             </div>
                         </div>
 
@@ -215,13 +271,12 @@ const showingNavigationDropdown = ref(false);
                             <ResponsiveNavLink :href="route('profile.edit')">
                                 Profile
                             </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('logout')"
-                                method="post"
-                                as="button"
+                            <button
+                                @click="handleLogout"
+                                class="block w-full px-4 py-2 text-start text-base font-medium text-gray-600 transition duration-150 ease-in-out hover:border-gray-300 hover:bg-gray-50 hover:text-gray-800 focus:border-gray-300 focus:bg-gray-50 focus:text-gray-800 focus:outline-none dark:text-gray-400 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-200 dark:focus:border-gray-600 dark:focus:bg-gray-700 dark:focus:text-gray-200"
                             >
                                 Log Out
-                            </ResponsiveNavLink>
+                            </button>
                         </div>
                     </div>
                 </div>

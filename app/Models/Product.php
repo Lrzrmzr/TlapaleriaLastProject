@@ -3,7 +3,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Product extends Model
 {
@@ -17,6 +17,32 @@ class Product extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    /**
+     * Relación many-to-many con proveedores
+     */
+    public function suppliers(): BelongsToMany
+    {
+        return $this->belongsToMany(Supplier::class, 'product_supplier')
+            ->withPivot('cost', 'supplier_code', 'is_preferred', 'last_purchase_date', 'notes')
+            ->withTimestamps();
+    }
+
+    /**
+     * Obtener el proveedor preferido
+     */
+    public function preferredSupplier()
+    {
+        return $this->suppliers()->wherePivot('is_preferred', true)->first();
+    }
+
+    /**
+     * Obtener el costo más bajo entre todos los proveedores
+     */
+    public function getLowestCostAttribute()
+    {
+        return $this->suppliers()->min('product_supplier.cost') ?? $this->cost ?? 0;
     }
 
     public function inventory(): HasMany

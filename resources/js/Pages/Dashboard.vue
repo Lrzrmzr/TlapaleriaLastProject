@@ -74,34 +74,34 @@ const quickActions = [
         hoverColor: 'hover:from-green-600 hover:to-emerald-700'
     },
     {
+        name: 'Productos',
+        description: 'Gestionar catálogo',
+        route: 'productos.index',
+        icon: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>`,
+        color: 'from-indigo-500 to-blue-600',
+        hoverColor: 'hover:from-indigo-600 hover:to-blue-700'
+    },
+    {
+        name: 'Inventario',
+        description: 'Control de stock',
+        route: 'inventario.index',
+        icon: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>`,
+        color: 'from-purple-500 to-pink-600',
+        hoverColor: 'hover:from-purple-600 hover:to-pink-700'
+    },
+    {
         name: 'Faltantes',
-        description: 'Ver productos faltantes',
+        description: 'Ver faltantes',
         route: 'faltantes.index',
         icon: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>`,
         color: 'from-orange-500 to-amber-600',
         hoverColor: 'hover:from-orange-600 hover:to-amber-700'
-    },
-    {
-        name: 'Usuarios',
-        description: 'Gestionar usuarios',
-        route: 'usuarios.index',
-        icon: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>`,
-        color: 'from-blue-500 to-cyan-600',
-        hoverColor: 'hover:from-blue-600 hover:to-cyan-700'
-    },
-    {
-        name: 'Inventario',
-        description: 'Control de stock',
-        route: 'dashboard',
-        icon: `<svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>`,
-        color: 'from-purple-500 to-pink-600',
-        hoverColor: 'hover:from-purple-600 hover:to-pink-700'
     }
 ];
 </script>

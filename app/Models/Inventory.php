@@ -5,7 +5,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Inventory extends Model
 {
-    protected $fillable = ['product_id', 'quantity', 'stock', 'min_stock'];
+    protected $fillable = ['product_id', 'stock', 'min_stock'];
+
+    // Alias para compatibilidad
+    public function getQuantityAttribute()
+    {
+        return $this->stock;
+    }
+
+    public function setQuantityAttribute($value)
+    {
+        $this->attributes['stock'] = $value;
+    }
 
     public function product(): BelongsTo
     {
@@ -17,7 +28,7 @@ class Inventory extends Model
      */
     public static function totalProductosEnStock()
     {
-        return self::sum('quantity');
+        return self::sum('stock');
     }
 
     /**
@@ -25,8 +36,8 @@ class Inventory extends Model
      */
     public static function productosStockBajo($limite = 2)
     {
-        return self::where('quantity', '<=', $limite)
-            ->where('quantity', '>=', 0)
+        return self::where('stock', '<=', $limite)
+            ->where('stock', '>=', 0)
             ->count();
     }
 }

@@ -2,6 +2,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Faltante;
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -61,7 +62,8 @@ class FaltanteController extends Controller
             'filters' => [
                 'confirmado' => $request->confirmado,
                 'pedido' => $request->pedido,
-            ]
+            ],
+            'faltantesManualesHabilitados' => SystemSetting::faltantesManualesHabilitados(),
         ]);
     }
 

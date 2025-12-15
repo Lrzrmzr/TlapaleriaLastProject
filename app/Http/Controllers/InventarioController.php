@@ -17,9 +17,9 @@ class InventarioController extends Controller
                 'product_id' => $inventario->product_id,
                 'product_name' => $inventario->product->name ?? 'Producto eliminado',
                 'product_price' => $inventario->product->price ?? 0,
-                'quantity' => $inventario->quantity ?? 0,
+                'quantity' => $inventario->stock ?? 0, // Devolver stock como quantity para el frontend
                 'min_stock' => $inventario->min_stock ?? 0,
-                'status' => $this->getStockStatus($inventario->quantity ?? 0, $inventario->min_stock ?? 0),
+                'status' => $this->getStockStatus($inventario->stock ?? 0, $inventario->min_stock ?? 0),
                 'updated_at' => $inventario->updated_at->format('d/m/Y H:i'),
             ];
         });
@@ -61,11 +61,11 @@ class InventarioController extends Controller
 
         Inventory::create([
             'product_id' => $request->product_id,
-            'quantity' => $request->quantity,
+            'stock' => $request->quantity, // Usar 'stock' en lugar de 'quantity'
             'min_stock' => $request->min_stock,
         ]);
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Inventario creado correctamente');
     }
 
     public function update(Request $request, Inventory $inventario)
@@ -76,11 +76,11 @@ class InventarioController extends Controller
         ]);
 
         $inventario->update([
-            'quantity' => $request->quantity,
+            'stock' => $request->quantity, // Usar 'stock' en lugar de 'quantity'
             'min_stock' => $request->min_stock,
         ]);
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Inventario actualizado correctamente');
     }
 
     public function ajustarStock(Request $request, Inventory $inventario)
@@ -90,7 +90,8 @@ class InventarioController extends Controller
             'tipo' => 'required|in:entrada,salida',
         ]);
 
-        $nuevaCantidad = $inventario->quantity;
+        // Usar 'stock' directamente del atributo de la BD
+        $nuevaCantidad = $inventario->stock;
 
         if ($request->tipo === 'entrada') {
             $nuevaCantidad += $request->cantidad;
@@ -101,9 +102,9 @@ class InventarioController extends Controller
             }
         }
 
-        $inventario->update(['quantity' => $nuevaCantidad]);
+        $inventario->update(['stock' => $nuevaCantidad]); // Usar 'stock' en lugar de 'quantity'
 
-        return redirect()->back();
+        return redirect()->back()->with('success', 'Stock ajustado correctamente');
     }
 
     public function destroy(Inventory $inventario)

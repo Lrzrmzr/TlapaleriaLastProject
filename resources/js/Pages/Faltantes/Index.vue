@@ -8,6 +8,7 @@ const props = defineProps({
     productosStockBajo: Array,
     stats: Object,
     filters: Object,
+    faltantesManualesHabilitados: Boolean,
 });
 
 // Estados para modales
@@ -156,6 +157,7 @@ function formatMoney(value) {
                         Stock Bajo ({{ stats.stockBajo }})
                     </button>
                     <button
+                        v-if="faltantesManualesHabilitados"
                         @click="showModalNuevoFaltante = true"
                         class="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
                     >
