@@ -1,12 +1,14 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, useForm, router, Link } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
-    productos: Array,
+    productos: Object, // Ahora es un objeto con datos de paginación
     proveedores: Array,
+    categorias: Array,
     stats: Object,
+    filters: Object,
 });
 
 // Estados
@@ -17,8 +19,13 @@ const showModalAgregarProveedor = ref(false);
 const showModalEditarProveedor = ref(false);
 const productoSeleccionado = ref(null);
 const proveedorSeleccionado = ref(null);
-const filtroStock = ref('');
-const busqueda = ref('');
+
+// Filtros (inicializados desde el servidor)
+const busqueda = ref(props.filters?.search || '');
+const filtroProveedor = ref(props.filters?.supplier_id || '');
+const filtroCategoria = ref(props.filters?.category_id || '');
+const filtroStock = ref(props.filters?.with_stock ? 'con_stock' : (props.filters?.without_inventory ? 'sin_inventario' : ''));
+const itemsPorPagina = ref(props.filters?.per_page || 50);
 
 // Forms
 const formNuevo = useForm({
@@ -29,6 +36,7 @@ const formNuevo = useForm({
     cost: 0,
     supplier_id: null,
     selected_suppliers: [], // Array de IDs de proveedores seleccionados
+    category_ids: [], // Array de IDs de categorías
 });
 
 const formEditar = useForm({
@@ -39,6 +47,7 @@ const formEditar = useForm({
     price: 0,
     cost: 0,
     supplier_id: null,
+    category_ids: [], // Array de IDs de categorías
 });
 
 const formAgregarProveedor = useForm({
@@ -58,27 +67,46 @@ const formEditarProveedor = useForm({
 
 // Computed
 const productosFiltrados = computed(() => {
-    let resultado = props.productos;
+    // Ahora los productos ya vienen filtrados del servidor
+    return props.productos.data || [];
+});
 
-    // Filtro por búsqueda
-    if (busqueda.value) {
-        resultado = resultado.filter(p =>
-            p.name.toLowerCase().includes(busqueda.value.toLowerCase()) ||
-            (p.barcode && p.barcode.toLowerCase().includes(busqueda.value.toLowerCase())) ||
-            (p.description && p.description.toLowerCase().includes(busqueda.value.toLowerCase()))
-        );
-    }
+// Función para aplicar filtros (del lado del servidor)
+let filtroTimeout = null;
+function aplicarFiltros() {
+    clearTimeout(filtroTimeout);
+    filtroTimeout = setTimeout(() => {
+        const params = {
+            search: busqueda.value || undefined,
+            supplier_id: filtroProveedor.value || undefined,
+            category_id: filtroCategoria.value || undefined,
+            with_stock: filtroStock.value === 'con_stock' ? true : undefined,
+            without_inventory: filtroStock.value === 'sin_inventario' ? true : undefined,
+            per_page: itemsPorPagina.value,
+        };
 
-    // Filtro por stock
-    if (filtroStock.value === 'con_stock') {
-        resultado = resultado.filter(p => p.stock > 0);
-    } else if (filtroStock.value === 'sin_stock') {
-        resultado = resultado.filter(p => p.stock === 0);
-    } else if (filtroStock.value === 'sin_inventario') {
-        resultado = resultado.filter(p => !p.has_inventory);
-    }
+        // Limpiar parámetros undefined
+        Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-    return resultado;
+        router.get(route('productos.index'), params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    }, 300); // Debounce de 300ms
+}
+
+// Función para limpiar filtros
+function limpiarFiltros() {
+    busqueda.value = '';
+    filtroProveedor.value = '';
+    filtroCategoria.value = '';
+    filtroStock.value = '';
+    aplicarFiltros();
+}
+
+// Watchers para aplicar filtros automáticamente
+watch([busqueda, filtroProveedor, filtroCategoria, filtroStock], () => {
+    aplicarFiltros();
 });
 
 const proveedoresDisponibles = computed(() => {
@@ -112,6 +140,7 @@ function abrirModalEditar(producto) {
     formEditar.price = producto.price;
     formEditar.cost = producto.cost;
     formEditar.supplier_id = producto.supplier_id;
+    formEditar.category_ids = producto.categories ? producto.categories.map(cat => cat.id) : [];
     showModalEditar.value = true;
 }
 
@@ -309,19 +338,52 @@ function formatMoney(value) {
                             />
                         </div>
                         <div>
-                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Filtrar por:</label>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Proveedor:</label>
+                            <select
+                                v-model="filtroProveedor"
+                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white min-w-[180px]"
+                            >
+                                <option value="">Todos los proveedores</option>
+                                <option v-for="proveedor in proveedores" :key="proveedor.id" :value="proveedor.id">
+                                    {{ proveedor.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Categoría:</label>
+                            <select
+                                v-model="filtroCategoria"
+                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white min-w-[180px]"
+                            >
+                                <option value="">Todas las categorías</option>
+                                <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
+                                    {{ categoria.icon }} {{ categoria.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Stock:</label>
                             <select
                                 v-model="filtroStock"
                                 class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                             >
-                                <option value="">Todos los productos</option>
+                                <option value="">Todos</option>
                                 <option value="con_stock">Con stock</option>
                                 <option value="sin_stock">Sin stock</option>
                                 <option value="sin_inventario">Sin inventario</option>
                             </select>
                         </div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400 mt-6">
-                            Mostrando {{ productosFiltrados.length }} de {{ productos.length }} productos
+                        <div class="flex items-center gap-4 mt-6">
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                Mostrando {{ productos.from || 0 }} - {{ productos.to || 0 }} de {{ productos.total || 0 }} productos
+                            </div>
+                            <button
+                                v-if="busqueda || filtroProveedor || filtroCategoria || filtroStock"
+                                @click="limpiarFiltros"
+                                class="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                                Limpiar filtros
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -348,6 +410,9 @@ function formatMoney(value) {
                                         Código
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Categorías
+                                    </th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Proveedores
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -363,7 +428,7 @@ function formatMoney(value) {
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 <tr v-if="productosFiltrados.length === 0">
-                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
@@ -384,6 +449,24 @@ function formatMoney(value) {
                                         <span class="text-sm text-gray-600 dark:text-gray-400">
                                             {{ producto.barcode || 'Sin código' }}
                                         </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div v-if="producto.categories && producto.categories.length > 0" class="flex flex-wrap gap-1">
+                                            <span
+                                                v-for="categoria in producto.categories"
+                                                :key="categoria.id"
+                                                class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium border"
+                                                :style="{
+                                                    backgroundColor: categoria.color + '20',
+                                                    borderColor: categoria.color,
+                                                    color: categoria.color
+                                                }"
+                                            >
+                                                <span class="mr-1">{{ categoria.icon }}</span>
+                                                {{ categoria.name }}
+                                            </span>
+                                        </div>
+                                        <span v-else class="text-xs text-gray-400 italic">Sin categoría</span>
                                     </td>
                                     <td class="px-6 py-4">
                                         <div v-if="producto.suppliers_count > 0" class="flex items-center gap-2">
@@ -453,6 +536,42 @@ function formatMoney(value) {
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Paginación -->
+                    <div v-if="productos.last_page > 1" class="mt-6 flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Items por página:</span>
+                            <select
+                                v-model="itemsPorPagina"
+                                @change="aplicarFiltros"
+                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                            >
+                                <option :value="25">25</option>
+                                <option :value="50">50</option>
+                                <option :value="100">100</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <Link
+                                v-for="link in productos.links"
+                                :key="link.label"
+                                :href="link.url"
+                                :class="[
+                                    'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+                                    link.active
+                                        ? 'bg-blue-600 text-white'
+                                        : link.url
+                                        ? 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                                ]"
+                                :disabled="!link.url"
+                                preserve-state
+                                preserve-scroll
+                                v-html="link.label"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -531,8 +650,33 @@ function formatMoney(value) {
                                 </div>
                             </div>
 
-                            <!-- Sección de Proveedores -->
+                            <!-- Sección de Categorías -->
                             <div class="col-span-2 mt-6">
+                                <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
+                                    <label class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                        </svg>
+                                        Categorías (Opcional)
+                                    </label>
+                                    <select
+                                        v-model="formNuevo.category_ids"
+                                        multiple
+                                        size="5"
+                                        class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
+                                            {{ categoria.icon }} {{ categoria.name }}
+                                        </option>
+                                    </select>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                        Mantén presionado Ctrl (Cmd en Mac) para seleccionar múltiples categorías
+                                    </p>
+                                </div>
+                            </div>
+
+                            <!-- Sección de Proveedores -->
+                            <div class="col-span-2 mt-4">
                                 <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
                                     <div class="mb-3">
                                         <label class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -649,6 +793,31 @@ function formatMoney(value) {
                                         class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white"
                                         required
                                     />
+                                </div>
+                            </div>
+
+                            <!-- Sección de Categorías -->
+                            <div class="col-span-2 mt-6">
+                                <div class="border-t border-gray-200 dark:border-gray-600 pt-4">
+                                    <label class="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <svg class="w-5 h-5 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                        </svg>
+                                        Categorías (Opcional)
+                                    </label>
+                                    <select
+                                        v-model="formEditar.category_ids"
+                                        multiple
+                                        size="5"
+                                        class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                    >
+                                        <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
+                                            {{ categoria.icon }} {{ categoria.name }}
+                                        </option>
+                                    </select>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                        Mantén presionado Ctrl (Cmd en Mac) para seleccionar múltiples categorías
+                                    </p>
                                 </div>
                             </div>
                         </div>

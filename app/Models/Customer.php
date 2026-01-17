@@ -1,11 +1,20 @@
 <?php
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Customer extends Model
 {
-    protected $fillable = ['name', 'phone', 'email', 'address'];
+    use SoftDeletes, LogsActivity;
+
+    protected $fillable = ['name', 'phone', 'email', 'address', 'active'];
+
+    protected $casts = [
+        'active' => 'boolean',
+    ];
 
     public function sales(): HasMany
     {
@@ -36,5 +45,25 @@ class Customer extends Model
     public static function totalClientes()
     {
         return self::count();
+    }
+
+    /**
+     * Scope para obtener solo clientes activos
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('active', true);
+    }
+
+    /**
+     * Configuración de Activity Log
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'phone', 'email', 'address', 'active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Cliente {$eventName}");
     }
 }

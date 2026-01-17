@@ -10,11 +10,32 @@ class GastoController extends Controller
 {
     public function index()
     {
-        $gastos = Gasto::latest()->get();
+        $gastos = Gasto::with('user')
+            ->latest()
+            ->get()
+            ->map(function ($gasto) {
+                return [
+                    'id' => $gasto->id,
+                    'descripcion' => $gasto->descripcion,
+                    'total' => $gasto->total,
+                    'created_at' => $gasto->created_at->toISOString(),
+                    'user' => $gasto->user ? [
+                        'id' => $gasto->user->id,
+                        'name' => $gasto->user->name,
+                    ] : null,
+                ];
+            });
+
         $user = Auth::user();
+
         return Inertia::render('Gastos/Index', [
             'gastos' => $gastos,
-            'user' => $user,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->roles->first()?->name ?? null,
+            ],
         ]);
     }
 
@@ -35,9 +56,12 @@ class GastoController extends Controller
     public function destroy(Gasto $gasto)
     {
         $user = Auth::user();
-        if ($user->role !== 'admin') {
+        $userRole = $user->roles->first();
+
+        if (!$userRole || ($userRole->name !== 'administrador' && $userRole->name !== 'root')) {
             abort(403, 'Solo el administrador puede eliminar gastos');
         }
+
         $gasto->delete();
         return redirect()->back();
     }

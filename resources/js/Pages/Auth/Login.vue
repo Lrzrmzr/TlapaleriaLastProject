@@ -111,7 +111,6 @@ const submit = async () => {
                         class="mt-2 block w-full rounded-xl border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-gray-50 text-gray-800"
                         v-model="form.email"
                         required
-                        autofocus
                         autocomplete="username"
                         :disabled="processing"
                     />

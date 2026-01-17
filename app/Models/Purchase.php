@@ -1,12 +1,21 @@
 <?php
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Purchase extends Model
 {
-    protected $fillable = ['supplier_id', 'user_id', 'total', 'status'];
+    use SoftDeletes, LogsActivity;
+
+    protected $fillable = ['supplier_id', 'user_id', 'branch_id', 'total', 'status'];
+
+    protected $casts = [
+        'total' => 'decimal:2',
+    ];
 
     public function supplier(): BelongsTo
     {
@@ -18,8 +27,41 @@ class Purchase extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
     public function purchaseDetails(): HasMany
     {
         return $this->hasMany(PurchaseDetail::class);
+    }
+
+    /**
+     * Scope para filtrar por sucursal
+     */
+    public function scopeForBranch($query, $branchId)
+    {
+        return $query->where('branch_id', $branchId);
+    }
+
+    /**
+     * Scope para solo compras completadas
+     */
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
+    }
+
+    /**
+     * Configuración de Activity Log
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Compra {$eventName}");
     }
 }

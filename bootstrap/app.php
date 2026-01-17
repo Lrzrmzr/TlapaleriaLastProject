@@ -21,6 +21,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'check.branch' => \App\Http\Middleware\CheckBranchAccess::class,
+        ]);
+
+        // Excluir /api/login de la verificación CSRF
+        $middleware->validateCsrfTokens(except: [
+            'api/login',
         ]);
 
         // Asegurar que las rutas API siempre devuelvan JSON

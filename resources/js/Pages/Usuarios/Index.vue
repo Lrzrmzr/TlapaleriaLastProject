@@ -6,6 +6,7 @@ import { ref, computed } from 'vue';
 const props = defineProps({
     usuarios: Array,
     roles: Array,
+    branches: Array,
     user: Object,
     stats: Object,
 });
@@ -33,6 +34,12 @@ function asignarRol(usuarioId, rolId) {
     router.post(route('usuarios.asignarRol'), {
         usuario_id: usuarioId,
         rol_id: rolId || null
+    });
+}
+
+function asignarSucursal(usuarioId, branchId) {
+    router.post(route('usuarios.asignarSucursal', usuarioId), {
+        branch_id: branchId || null
     });
 }
 
@@ -186,10 +193,13 @@ function getRolColor(rolName) {
                                         Rol Actual
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                                        Registrado
+                                        Sucursal
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Asignar Rol
+                                    </th>
+                                    <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Asignar Sucursal
                                     </th>
                                     <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Acciones
@@ -198,7 +208,7 @@ function getRolColor(rolName) {
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 <tr v-if="usuariosFiltrados.length === 0">
-                                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                         </svg>
@@ -242,8 +252,29 @@ function getRolColor(rolName) {
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="text-sm text-gray-500 dark:text-gray-400">
-                                            {{ usuario.created_at }}
+                                        <span
+                                            v-if="usuario.branch"
+                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                        >
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                            {{ usuario.branch.name }}
+                                        </span>
+                                        <span
+                                            v-else-if="usuario.role?.id === 1"
+                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                                        >
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Todas las sucursales
+                                        </span>
+                                        <span
+                                            v-else
+                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                                        >
+                                            Sin sucursal
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
@@ -256,6 +287,23 @@ function getRolColor(rolName) {
                                             <option value="">Sin rol</option>
                                             <option v-for="rol in roles" :key="rol.id" :value="rol.id">{{ rol.name }}</option>
                                         </select>
+                                        <span v-else class="text-sm text-gray-400 dark:text-gray-500">
+                                            Solo admin
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <select
+                                            v-if="esAdmin && usuario.role?.id !== 1"
+                                            @change="asignarSucursal(usuario.id, $event.target.value)"
+                                            :value="usuario.branch?.id ?? ''"
+                                            class="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                                        >
+                                            <option value="">Sin sucursal</option>
+                                            <option v-for="branch in branches" :key="branch.id" :value="branch.id">{{ branch.name }}</option>
+                                        </select>
+                                        <span v-else-if="usuario.role?.id === 1" class="text-sm text-purple-600 dark:text-purple-400 font-medium">
+                                            No requiere
+                                        </span>
                                         <span v-else class="text-sm text-gray-400 dark:text-gray-500">
                                             Solo admin
                                         </span>
@@ -339,6 +387,30 @@ function getRolColor(rolName) {
                                         </span>
                                     </div>
                                     <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                        <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Sucursal</p>
+                                        <span
+                                            v-if="usuarioSeleccionado.branch"
+                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
+                                        >
+                                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                            {{ usuarioSeleccionado.branch.name }}
+                                        </span>
+                                        <span
+                                            v-else-if="usuarioSeleccionado.role?.id === 1"
+                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300"
+                                        >
+                                            Todas
+                                        </span>
+                                        <span
+                                            v-else
+                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
+                                        >
+                                            Sin asignar
+                                        </span>
+                                    </div>
+                                    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 col-span-2">
                                         <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Registrado</p>
                                         <p class="text-lg font-bold text-gray-900 dark:text-white">{{ usuarioSeleccionado.created_at }}</p>
                                     </div>

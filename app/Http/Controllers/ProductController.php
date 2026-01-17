@@ -9,9 +9,53 @@ use Inertia\Inertia;
 
 class ProductController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $productos = Product::with(['supplier', 'inventory', 'suppliers'])->get()->map(function ($producto) {
+        // Construir query con filtros
+        $query = Product::with(['supplier', 'inventory', 'suppliers', 'categories']);
+
+        // Filtro: Búsqueda por nombre, descripción o código de barras
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('description', 'like', "%{$search}%")
+                  ->orWhere('barcode', 'like', "%{$search}%");
+            });
+        }
+
+        // Filtro: Por proveedor
+        if ($request->filled('supplier_id')) {
+            $query->where('supplier_id', $request->supplier_id);
+        }
+
+        // Filtro: Por categoría
+        if ($request->filled('category_id')) {
+            $query->whereHas('categories', function ($q) use ($request) {
+                $q->where('categories.id', $request->category_id);
+            });
+        }
+
+        // Filtro: Solo productos con stock
+        if ($request->filled('with_stock') && $request->with_stock) {
+            $query->whereHas('inventory', function ($q) {
+                $q->where('stock', '>', 0);
+            });
+        }
+
+        // Filtro: Solo productos sin inventario
+        if ($request->filled('without_inventory') && $request->without_inventory) {
+            $query->whereDoesntHave('inventory');
+        }
+
+        // Ordenamiento
+        $sortBy = $request->get('sort_by', 'created_at');
+        $sortOrder = $request->get('sort_order', 'desc');
+        $query->orderBy($sortBy, $sortOrder);
+
+        // Paginación (50 por página)
+        $perPage = $request->get('per_page', 50);
+        $productos = $query->paginate($perPage)->through(function ($producto) {
             $inventario = $producto->inventory->first();
 
             // Obtener información de todos los proveedores
@@ -24,6 +68,17 @@ class ProductController extends Controller
                     'is_preferred' => $supplier->pivot->is_preferred,
                     'last_purchase_date' => $supplier->pivot->last_purchase_date,
                     'notes' => $supplier->pivot->notes,
+                ];
+            });
+
+            // Obtener categorías
+            $categoriesData = $producto->categories->map(function ($category) {
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'slug' => $category->slug,
+                    'icon' => $category->icon,
+                    'color' => $category->color,
                 ];
             });
 
@@ -41,11 +96,14 @@ class ProductController extends Controller
                 'lowest_cost' => $proveedoresData->min('cost') ?? $producto->cost ?? 0,
                 'stock' => $inventario ? ($inventario->stock ?? 0) : 0,
                 'has_inventory' => $inventario ? true : false,
+                'categories' => $categoriesData,
+                'categories_count' => $categoriesData->count(),
                 'created_at' => $producto->created_at ? $producto->created_at->format('d/m/Y') : 'N/A',
                 'updated_at' => $producto->updated_at ? $producto->updated_at->format('d/m/Y H:i') : 'N/A',
             ];
         });
 
+        // Proveedores para el filtro
         $proveedores = Supplier::all()->map(function ($supplier) {
             return [
                 'id' => $supplier->id,
@@ -53,22 +111,47 @@ class ProductController extends Controller
             ];
         });
 
-        // Estadísticas
+        // Categorías para el filtro
+        $categorias = \App\Models\Category::active()
+            ->ordered()
+            ->get()
+            ->map(function ($category) {
+                return [
+                    'id' => $category->id,
+                    'name' => $category->name,
+                    'slug' => $category->slug,
+                    'icon' => $category->icon,
+                    'color' => $category->color,
+                ];
+            });
+
+        // Estadísticas (optimizadas)
         $totalProductos = Product::count();
         $productosConStock = Product::whereHas('inventory', function ($query) {
             $query->where('stock', '>', 0);
         })->count();
         $productosSinInventario = Product::whereDoesntHave('inventory')->count();
-        $valorTotalInventario = Product::with('inventory')->get()->sum(function ($product) {
-            $inventario = $product->inventory->first();
-            if (!$inventario) return 0;
-            $stock = $inventario->stock ?? 0;
-            return $stock * $product->price;
-        });
+
+        // Valor total del inventario (optimizado con join)
+        $valorTotalInventario = \DB::table('products')
+            ->join('branch_inventory', 'products.id', '=', 'branch_inventory.product_id')
+            ->selectRaw('SUM(branch_inventory.stock * products.price) as total')
+            ->value('total') ?? 0;
 
         return Inertia::render('Productos/Index', [
             'productos' => $productos,
             'proveedores' => $proveedores,
+            'categorias' => $categorias,
+            'filters' => [
+                'search' => $request->search,
+                'supplier_id' => $request->supplier_id,
+                'category_id' => $request->category_id,
+                'with_stock' => $request->with_stock,
+                'without_inventory' => $request->without_inventory,
+                'sort_by' => $sortBy,
+                'sort_order' => $sortOrder,
+                'per_page' => $perPage,
+            ],
             'stats' => [
                 'total' => $totalProductos,
                 'conStock' => $productosConStock,
@@ -89,6 +172,8 @@ class ProductController extends Controller
             'supplier_id' => 'nullable|exists:suppliers,id',
             'selected_suppliers' => 'nullable|array',
             'selected_suppliers.*' => 'exists:suppliers,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'exists:categories,id',
         ]);
 
         $producto = Product::create([
@@ -113,6 +198,24 @@ class ProductController extends Controller
             }
         }
 
+        // Adjuntar categorías seleccionadas si se proporcionaron
+        if ($request->has('category_ids') && is_array($request->category_ids)) {
+            $producto->categories()->sync($request->category_ids);
+
+            // Registrar en activity log
+            if (!empty($request->category_ids)) {
+                $categoryNames = \App\Models\Category::whereIn('id', $request->category_ids)->pluck('name')->toArray();
+                activity()
+                    ->performedOn($producto)
+                    ->causedBy(auth()->user())
+                    ->withProperties([
+                        'category_ids' => $request->category_ids,
+                        'category_names' => $categoryNames,
+                    ])
+                    ->log('Categorías asignadas al crear producto: ' . implode(', ', $categoryNames));
+            }
+        }
+
         return redirect()->back()->with('success', 'Producto creado exitosamente');
     }
 
@@ -125,6 +228,8 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'cost' => 'nullable|numeric|min:0',
             'supplier_id' => 'nullable|exists:suppliers,id',
+            'category_ids' => 'nullable|array',
+            'category_ids.*' => 'exists:categories,id',
         ]);
 
         $producto->update([
@@ -135,6 +240,41 @@ class ProductController extends Controller
             'cost' => $request->cost,
             'supplier_id' => $request->supplier_id,
         ]);
+
+        // Sincronizar categorías si se proporcionaron
+        if ($request->has('category_ids')) {
+            $oldCategoryIds = $producto->categories()->pluck('categories.id')->toArray();
+            $producto->categories()->sync($request->category_ids);
+            $newCategoryIds = $request->category_ids ?? [];
+
+            // Registrar cambios en activity log si hubo diferencias
+            $added = array_diff($newCategoryIds, $oldCategoryIds);
+            $removed = array_diff($oldCategoryIds, $newCategoryIds);
+
+            if (!empty($added) || !empty($removed)) {
+                $addedNames = !empty($added) ? \App\Models\Category::whereIn('id', $added)->pluck('name')->toArray() : [];
+                $removedNames = !empty($removed) ? \App\Models\Category::whereIn('id', $removed)->pluck('name')->toArray() : [];
+
+                $changes = [];
+                if (!empty($addedNames)) {
+                    $changes[] = 'Agregadas: ' . implode(', ', $addedNames);
+                }
+                if (!empty($removedNames)) {
+                    $changes[] = 'Removidas: ' . implode(', ', $removedNames);
+                }
+
+                activity()
+                    ->performedOn($producto)
+                    ->causedBy(auth()->user())
+                    ->withProperties([
+                        'old_category_ids' => $oldCategoryIds,
+                        'new_category_ids' => $newCategoryIds,
+                        'added' => $addedNames,
+                        'removed' => $removedNames,
+                    ])
+                    ->log('Categorías modificadas: ' . implode(' | ', $changes));
+            }
+        }
 
         return redirect()->back()->with('success', 'Producto actualizado exitosamente');
     }
@@ -229,5 +369,135 @@ class ProductController extends Controller
     {
         $producto->suppliers()->detach($supplier->id);
         return redirect()->back()->with('success', 'Proveedor eliminado exitosamente');
+    }
+
+    /**
+     * Sincronizar categorías de un producto
+     */
+    public function syncCategories(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $validated = $request->validate([
+            'category_ids' => 'required|array',
+            'category_ids.*' => 'exists:categories,id',
+        ]);
+
+        // Obtener categorías anteriores
+        $oldCategoryIds = $product->categories()->pluck('categories.id')->toArray();
+
+        // Sync reemplaza todas las categorías existentes con las nuevas
+        $product->categories()->sync($validated['category_ids']);
+
+        // Registrar en activity log
+        $newCategoryIds = $validated['category_ids'];
+        $added = array_diff($newCategoryIds, $oldCategoryIds);
+        $removed = array_diff($oldCategoryIds, $newCategoryIds);
+
+        if (!empty($added) || !empty($removed)) {
+            $addedNames = !empty($added) ? \App\Models\Category::whereIn('id', $added)->pluck('name')->toArray() : [];
+            $removedNames = !empty($removed) ? \App\Models\Category::whereIn('id', $removed)->pluck('name')->toArray() : [];
+
+            $changes = [];
+            if (!empty($addedNames)) {
+                $changes[] = 'Agregadas: ' . implode(', ', $addedNames);
+            }
+            if (!empty($removedNames)) {
+                $changes[] = 'Removidas: ' . implode(', ', $removedNames);
+            }
+
+            activity()
+                ->performedOn($product)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'old_category_ids' => $oldCategoryIds,
+                    'new_category_ids' => $newCategoryIds,
+                    'added' => $addedNames,
+                    'removed' => $removedNames,
+                ])
+                ->log('Categorías sincronizadas: ' . implode(' | ', $changes));
+        }
+
+        return response()->json([
+            'message' => 'Categorías actualizadas exitosamente',
+            'categories' => $product->categories
+        ]);
+    }
+
+    /**
+     * Agregar una categoría a un producto
+     */
+    public function attachCategory(Request $request, $id)
+    {
+        $product = Product::findOrFail($id);
+
+        $validated = $request->validate([
+            'category_id' => 'required|exists:categories,id',
+        ]);
+
+        // Verificar si ya está asociada
+        if ($product->categories()->where('category_id', $validated['category_id'])->exists()) {
+            return response()->json([
+                'message' => 'Esta categoría ya está asociada al producto'
+            ], 422);
+        }
+
+        $product->categories()->attach($validated['category_id']);
+
+        // Registrar en activity log
+        $category = \App\Models\Category::find($validated['category_id']);
+        activity()
+            ->performedOn($product)
+            ->causedBy(auth()->user())
+            ->withProperties([
+                'category_id' => $validated['category_id'],
+                'category_name' => $category->name,
+            ])
+            ->log('Categoría agregada: ' . $category->name);
+
+        return response()->json([
+            'message' => 'Categoría agregada exitosamente',
+            'categories' => $product->categories
+        ]);
+    }
+
+    /**
+     * Eliminar una categoría de un producto
+     */
+    public function detachCategory($productId, $categoryId)
+    {
+        $product = Product::findOrFail($productId);
+
+        // Obtener nombre de la categoría antes de eliminarla
+        $category = \App\Models\Category::find($categoryId);
+
+        $product->categories()->detach($categoryId);
+
+        // Registrar en activity log
+        if ($category) {
+            activity()
+                ->performedOn($product)
+                ->causedBy(auth()->user())
+                ->withProperties([
+                    'category_id' => $categoryId,
+                    'category_name' => $category->name,
+                ])
+                ->log('Categoría removida: ' . $category->name);
+        }
+
+        return response()->json([
+            'message' => 'Categoría eliminada exitosamente',
+            'categories' => $product->categories
+        ]);
+    }
+
+    /**
+     * Obtener categorías de un producto
+     */
+    public function getCategories($id)
+    {
+        $product = Product::with('categories')->findOrFail($id);
+
+        return response()->json($product->categories);
     }
 }

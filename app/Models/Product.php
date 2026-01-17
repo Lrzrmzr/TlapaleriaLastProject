@@ -1,17 +1,23 @@
 <?php
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Product extends Model
 {
-    protected $fillable = ['name', 'description', 'barcode', 'price', 'cost', 'supplier_id'];
+    use SoftDeletes, LogsActivity;
+
+    protected $fillable = ['name', 'description', 'barcode', 'price', 'cost', 'supplier_id', 'active'];
 
     protected $casts = [
         'price' => 'decimal:2',
         'cost' => 'decimal:2',
+        'active' => 'boolean',
     ];
 
     public function supplier(): BelongsTo
@@ -26,6 +32,15 @@ class Product extends Model
     {
         return $this->belongsToMany(Supplier::class, 'product_supplier')
             ->withPivot('cost', 'supplier_code', 'is_preferred', 'last_purchase_date', 'notes')
+            ->withTimestamps();
+    }
+
+    /**
+     * Relación many-to-many con categorías
+     */
+    public function categories(): BelongsToMany
+    {
+        return $this->belongsToMany(Category::class, 'category_product')
             ->withTimestamps();
     }
 
@@ -50,6 +65,24 @@ class Product extends Model
         return $this->hasMany(Inventory::class);
     }
 
+    /**
+     * Relación con inventario por sucursal
+     */
+    public function branchInventory(): HasMany
+    {
+        return $this->hasMany(BranchInventory::class);
+    }
+
+    /**
+     * Relación muchos a muchos con sucursales a través del inventario
+     */
+    public function branches(): BelongsToMany
+    {
+        return $this->belongsToMany(Branch::class, 'branch_inventory')
+            ->withPivot('stock', 'min_stock', 'max_stock', 'cost', 'active')
+            ->withTimestamps();
+    }
+
     public function saleDetails(): HasMany
     {
         return $this->hasMany(SaleDetail::class);
@@ -58,6 +91,26 @@ class Product extends Model
     public function purchaseDetails(): HasMany
     {
         return $this->hasMany(PurchaseDetail::class);
+    }
+
+    /**
+     * Scope para obtener solo productos activos
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('active', true);
+    }
+
+    /**
+     * Configuración de Activity Log
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'description', 'barcode', 'price', 'cost', 'supplier_id', 'active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Producto {$eventName}");
     }
 
     /**

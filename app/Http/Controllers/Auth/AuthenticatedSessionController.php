@@ -41,6 +41,11 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): RedirectResponse
     {
+        // Revocar tokens de Passport si existen
+        if ($request->user() && method_exists($request->user(), 'tokens')) {
+            $request->user()->tokens()->delete();
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

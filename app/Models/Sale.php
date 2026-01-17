@@ -1,13 +1,18 @@
 <?php
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Sale extends Model
 {
-    protected $fillable = ['customer_id', 'user_id', 'total', 'status'];
+    use SoftDeletes, LogsActivity;
+
+    protected $fillable = ['customer_id', 'user_id', 'branch_id', 'total', 'status'];
 
     protected $casts = [
         'total' => 'decimal:2',
@@ -28,6 +33,11 @@ class Sale extends Model
     public function saleDetails(): HasMany
     {
         return $this->hasMany(SaleDetail::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     /**
@@ -98,5 +108,33 @@ class Sale extends Model
     public static function conteoVentasHoy()
     {
         return self::whereDate('created_at', today())->count();
+    }
+
+    /**
+     * Scope para filtrar por sucursal
+     */
+    public function scopeForBranch($query, $branchId)
+    {
+        return $query->where('branch_id', $branchId);
+    }
+
+    /**
+     * Scope para solo ventas completadas
+     */
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
+    }
+
+    /**
+     * Configuración de Activity Log
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Venta {$eventName}");
     }
 }

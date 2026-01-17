@@ -8,19 +8,46 @@ use Inertia\Inertia;
 Route::get('/', [\App\Http\Controllers\PublicController::class, 'index'])->name('public.home');
 
 Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
-    ->middleware(['auth', 'verified'])
+    ->middleware(['auth', 'verified', 'check.branch'])
     ->name('dashboard');
+
+// Página para usuarios sin sucursal asignada (NO requiere check.branch)
+Route::get('/sin-sucursal', function () {
+    return Inertia::render('SinSucursal');
+})->middleware(['auth'])->name('sin-sucursal');
 
 
 use App\Http\Controllers\FaltanteController;
 
-// Usuarios
-Route::middleware(['auth'])->group(function () {
+// Usuarios - Requiere validación de sucursal
+Route::middleware(['auth', 'check.branch'])->group(function () {
     Route::get('/usuarios', [\App\Http\Controllers\UsuarioController::class, 'index'])->name('usuarios.index');
     Route::post('/usuarios/asignar-rol', [\App\Http\Controllers\UsuarioController::class, 'asignarRol'])->name('usuarios.asignarRol');
+    Route::post('/usuarios/{user}/asignar-sucursal', [\App\Http\Controllers\UsuarioController::class, 'asignarSucursal'])->name('usuarios.asignarSucursal');
 });
 
-Route::middleware('auth')->group(function () {
+// Categorías - Requiere validación de sucursal
+Route::middleware(['auth', 'check.branch'])->group(function () {
+    Route::get('/categorias', [\App\Http\Controllers\CategoryController::class, 'index'])->name('categorias.index');
+    Route::post('/categorias', [\App\Http\Controllers\CategoryController::class, 'store'])->name('categorias.store');
+    Route::put('/categorias/{id}', [\App\Http\Controllers\CategoryController::class, 'update'])->name('categorias.update');
+    Route::delete('/categorias/{id}', [\App\Http\Controllers\CategoryController::class, 'destroy'])->name('categorias.destroy');
+});
+
+// Sucursales - Requiere validación de sucursal
+Route::middleware(['auth', 'check.branch'])->group(function () {
+    Route::get('/sucursales', [\App\Http\Controllers\BranchController::class, 'index'])->name('sucursales.index');
+    Route::post('/sucursales', [\App\Http\Controllers\BranchController::class, 'store'])->name('sucursales.store');
+    Route::put('/sucursales/{id}', [\App\Http\Controllers\BranchController::class, 'update'])->name('sucursales.update');
+    Route::delete('/sucursales/{id}', [\App\Http\Controllers\BranchController::class, 'destroy'])->name('sucursales.destroy');
+    Route::post('/sucursales/{id}/restore', [\App\Http\Controllers\BranchController::class, 'restore'])->name('sucursales.restore');
+    Route::post('/sucursales/{id}/toggle-status', [\App\Http\Controllers\BranchController::class, 'toggleStatus'])->name('sucursales.toggle-status');
+    Route::get('/sucursales/{id}/inventory', [\App\Http\Controllers\BranchController::class, 'inventory'])->name('sucursales.inventory');
+    Route::get('/sucursales/{id}/statistics', [\App\Http\Controllers\BranchController::class, 'statistics'])->name('sucursales.statistics');
+    Route::get('/sucursales-active', [\App\Http\Controllers\BranchController::class, 'active'])->name('sucursales.active');
+});
+
+Route::middleware(['auth', 'check.branch'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -70,6 +97,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/settings', [\App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/update', [\App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
     Route::post('/settings/generar-faltantes', [\App\Http\Controllers\SettingsController::class, 'generarFaltantesAutomatico'])->name('settings.generar-faltantes');
+
+    // Auditoría (Activity Logs)
+    Route::get('/auditoria', [\App\Http\Controllers\AuditController::class, 'index'])->name('auditoria.index');
+    Route::get('/auditoria/{id}', [\App\Http\Controllers\AuditController::class, 'show'])->name('auditoria.show');
 });
 
 require __DIR__.'/auth.php';

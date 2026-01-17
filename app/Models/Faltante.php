@@ -1,11 +1,16 @@
 <?php
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Faltante extends Model
 {
-    protected $fillable = ['descripcion', 'pedido', 'user_id', 'confirmado'];
+    use SoftDeletes, LogsActivity;
+
+    protected $fillable = ['descripcion', 'pedido', 'user_id', 'branch_id', 'confirmado'];
 
     protected $casts = [
         'confirmado' => 'boolean',
@@ -14,6 +19,19 @@ class Faltante extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    /**
+     * Scope para filtrar por sucursal
+     */
+    public function scopeForBranch($query, $branchId)
+    {
+        return $query->where('branch_id', $branchId);
     }
 
     /**
@@ -48,5 +66,17 @@ class Faltante extends Model
         $hoy = self::faltantesHoy();
         $ayer = self::faltantesAyer();
         return $hoy - $ayer;
+    }
+
+    /**
+     * Configuración de Activity Log
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['descripcion', 'pedido', 'user_id', 'branch_id', 'confirmado'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Faltante {$eventName}");
     }
 }

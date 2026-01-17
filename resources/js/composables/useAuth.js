@@ -2,9 +2,23 @@ import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 
+// Función auxiliar para obtener usuario del storage de forma segura
+function getUserFromStorage() {
+    try {
+        const userFromStorage = localStorage.getItem('user');
+        if (!userFromStorage || userFromStorage === 'undefined' || userFromStorage === 'null') {
+            return null;
+        }
+        return JSON.parse(userFromStorage);
+    } catch (error) {
+        console.error('Error al parsear usuario del localStorage:', error);
+        return null;
+    }
+}
+
 // Estado global de autenticación
 const token = ref(localStorage.getItem('access_token') || null);
-const user = ref(JSON.parse(localStorage.getItem('user') || 'null'));
+const user = ref(getUserFromStorage());
 
 export function useAuth() {
 
@@ -22,7 +36,9 @@ export function useAuth() {
         try {
             const response = await axios.post('/api/login', credentials);
 
-            const { access_token, user: userData } = response.data;
+            // La API devuelve: { success: true, data: { user: {...}, token: "..." } }
+            const { data } = response.data;
+            const { token: access_token, user: userData } = data;
 
             // Guardar token y usuario en localStorage
             token.value = access_token;
@@ -42,18 +58,14 @@ export function useAuth() {
     };
 
     /**
-     * Logout - Revoca el token
+     * Logout - Revoca el token y cierra sesión web
      */
     const logout = async () => {
         try {
-            // Intentar revocar el token en el servidor
-            if (token.value) {
-                await axios.post('/api/logout', {}, {
-                    headers: { 'Authorization': `Bearer ${token.value}` }
-                });
-            }
+            // Llamar al endpoint web de logout (cierra sesión + revoca tokens)
+            await axios.post('/logout');
         } catch (error) {
-            console.error('Error al revocar token:', error);
+            console.error('Error al hacer logout:', error);
         } finally {
             // Limpiar estado local
             token.value = null;

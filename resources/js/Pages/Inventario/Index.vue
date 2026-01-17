@@ -1,12 +1,16 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { Head, useForm, router, Link } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
 
 const props = defineProps({
-    inventarios: Array,
+    inventarios: Object, // Ahora es un objeto con datos de paginación
     productosSinInventario: Array,
+    branches: Array,
+    userBranch: Object,
+    isRoot: Boolean,
     stats: Object,
+    filters: Object,
 });
 
 // Estados
@@ -15,11 +19,17 @@ const showModalEditar = ref(false);
 const showModalAjustar = ref(false);
 const showModalSinInventario = ref(false);
 const inventarioSeleccionado = ref(null);
-const filtroEstado = ref('');
+
+// Filtros (inicializados desde el servidor)
+const busqueda = ref(props.filters?.search || '');
+const sucursalSeleccionada = ref(props.filters?.branch_id || '');
+const filtroEstado = ref(props.filters?.stock_status || '');
+const itemsPorPagina = ref(props.filters?.per_page || 50);
 
 // Forms
 const formNuevo = useForm({
     product_id: null,
+    branch_id: null,
     quantity: 0,
     min_stock: 5,
 });
@@ -37,13 +47,64 @@ const formAjustar = useForm({
 
 // Computed
 const inventariosFiltrados = computed(() => {
-    if (!filtroEstado.value) return props.inventarios;
-    return props.inventarios.filter(inv => inv.status === filtroEstado.value);
+    // Ahora los inventarios ya vienen filtrados del servidor
+    return props.inventarios.data || [];
+});
+
+// Función para aplicar filtros (del lado del servidor)
+let filtroTimeout = null;
+function aplicarFiltros() {
+    clearTimeout(filtroTimeout);
+    filtroTimeout = setTimeout(() => {
+        const params = {
+            search: busqueda.value || undefined,
+            branch_id: sucursalSeleccionada.value || undefined,
+            stock_status: filtroEstado.value || undefined,
+            per_page: itemsPorPagina.value,
+        };
+
+        // Limpiar parámetros undefined
+        Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+
+        router.get(route('inventario.index'), params, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    }, 300); // Debounce de 300ms
+}
+
+// Función para limpiar filtros
+function limpiarFiltros() {
+    busqueda.value = '';
+    sucursalSeleccionada.value = '';
+    filtroEstado.value = '';
+    aplicarFiltros();
+}
+
+// Watchers para aplicar filtros automáticamente
+watch([busqueda, sucursalSeleccionada, filtroEstado], () => {
+    aplicarFiltros();
+});
+
+// Nombre de la sucursal actual
+const sucursalActual = computed(() => {
+    if (props.isRoot) {
+        if (sucursalSeleccionada.value) {
+            const branch = props.branches.find(b => b.id === parseInt(sucursalSeleccionada.value));
+            return branch ? branch.name : 'Todas las Sucursales';
+        }
+        return 'Todas las Sucursales';
+    }
+    return props.userBranch?.name || 'Sin Sucursal';
 });
 
 // Funciones
 function abrirModalNuevo() {
     formNuevo.reset();
+    // Si es root y hay una sucursal seleccionada, preseleccionarla
+    if (props.isRoot && sucursalSeleccionada.value) {
+        formNuevo.branch_id = parseInt(sucursalSeleccionada.value);
+    }
     showModalNuevo.value = true;
 }
 
@@ -138,6 +199,9 @@ function formatMoney(value) {
                     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
                         Control de stock y productos en almacén
                     </p>
+                    <p v-if="!isRoot" class="text-sm font-medium text-blue-600 dark:text-blue-400 mt-2">
+                        📍 Sucursal: {{ sucursalActual }}
+                    </p>
                 </div>
                 <div class="flex gap-3">
                     <button
@@ -163,9 +227,9 @@ function formatMoney(value) {
             </div>
         </template>
 
-        <div class="py-6">
-            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-
+        <!-- Stats Cards -->
+        <div class="mx-auto max-w-7xl">
+            <div class="mb-6">
                 <!-- Stats Cards -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     <div class="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl p-6 shadow-lg">
@@ -233,22 +297,58 @@ function formatMoney(value) {
                     </div>
                 </div>
 
+                <!-- Selector de Sucursal (solo para Root) -->
+                <div v-if="isRoot" class="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 rounded-2xl shadow-lg p-6 mb-6 border-2 border-purple-200 dark:border-purple-800">
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                            </svg>
+                            <label class="text-base font-bold text-purple-900 dark:text-purple-200">Seleccionar Sucursal:</label>
+                        </div>
+                        <select
+                            v-model="sucursalSeleccionada"
+                            class="border-2 border-purple-300 dark:border-purple-600 rounded-xl px-6 py-3 text-base font-medium focus:ring-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-white shadow-md"
+                        >
+                            <option :value="null">🌐 Todas las Sucursales</option>
+                            <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                                📍 {{ branch.name }} ({{ branch.code }})
+                            </option>
+                        </select>
+                        <span v-if="sucursalSeleccionada" class="inline-flex items-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 rounded-lg text-sm font-semibold">
+                            Mostrando: {{ sucursalActual }}
+                        </span>
+                    </div>
+                </div>
+
                 <!-- Filtros -->
                 <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-6">
-                    <div class="flex items-center gap-4">
-                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Filtrar por estado:</label>
-                        <select
-                            v-model="filtroEstado"
-                            class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                        >
-                            <option value="">Todos los productos</option>
-                            <option value="normal">Normal</option>
-                            <option value="bajo">Stock Bajo</option>
-                            <option value="critico">Crítico</option>
-                            <option value="agotado">Agotado</option>
-                        </select>
-                        <span class="text-sm text-gray-600 dark:text-gray-400">
-                            Mostrando {{ inventariosFiltrados.length }} de {{ inventarios.length }} productos
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex-1 min-w-[300px]">
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Buscar producto:</label>
+                            <input
+                                v-model="busqueda"
+                                type="text"
+                                placeholder="Nombre o código de producto..."
+                                class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                            />
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">Estado de stock:</label>
+                            <select
+                                v-model="filtroEstado"
+                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                            >
+                                <option value="">Todos</option>
+                                <option value="normal">Normal</option>
+                                <option value="bajo">Stock Bajo</option>
+                                <option value="critico">Crítico</option>
+                                <option value="agotado">Agotado</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-4 mt-6">
+                            <span class="text-sm text-gray-600 dark:text-gray-400">
+                                Mostrando {{ inventarios.from || 0 }} - {{ inventarios.to || 0 }} de {{ inventarios.total || 0 }} productos
                         </span>
                     </div>
                 </div>
@@ -270,6 +370,9 @@ function formatMoney(value) {
                                 <tr>
                                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Producto
+                                    </th>
+                                    <th v-if="isRoot" class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                                        Sucursal
                                     </th>
                                     <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                                         Precio
@@ -293,7 +396,7 @@ function formatMoney(value) {
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 <tr v-if="inventariosFiltrados.length === 0">
-                                    <td colspan="7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                                    <td :colspan="isRoot ? 8 : 7" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
                                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                         </svg>
@@ -306,6 +409,17 @@ function formatMoney(value) {
                                         <div class="text-sm font-medium text-gray-900 dark:text-white">
                                             {{ inventario.product_name }}
                                         </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ inventario.product_code }}
+                                        </div>
+                                    </td>
+                                    <td v-if="isRoot" class="px-6 py-4 whitespace-nowrap">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
+                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                            {{ inventario.branch_name }}
+                                        </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span class="text-sm font-semibold text-gray-900 dark:text-white">
@@ -370,9 +484,46 @@ function formatMoney(value) {
                             </tbody>
                         </table>
                     </div>
+
+                    <!-- Paginación -->
+                    <div v-if="inventarios.last_page > 1" class="mt-6 flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-gray-700 dark:text-gray-300">Items por página:</span>
+                            <select
+                                v-model="itemsPorPagina"
+                                @change="aplicarFiltros"
+                                class="border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1 text-sm focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                            >
+                                <option :value="25">25</option>
+                                <option :value="50">50</option>
+                                <option :value="100">100</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <Link
+                                v-for="link in inventarios.links"
+                                :key="link.label"
+                                :href="link.url"
+                                :class="[
+                                    'px-4 py-2 text-sm font-medium rounded-lg transition-colors',
+                                    link.active
+                                        ? 'bg-blue-600 text-white'
+                                        : link.url
+                                        ? 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                                ]"
+                                :disabled="!link.url"
+                                preserve-state
+                                preserve-scroll
+                                v-html="link.label"
+                            />
+                        </div>
+                    </div>
                 </div>
 
             </div>
+        </div>
         </div>
 
         <!-- Modal Nuevo Inventario -->
@@ -398,6 +549,28 @@ function formatMoney(value) {
                             </div>
 
                             <div class="space-y-4">
+                                <!-- Selector de Sucursal (solo para Root) -->
+                                <div v-if="isRoot">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        <span class="flex items-center gap-2">
+                                            <svg class="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                            Sucursal
+                                        </span>
+                                    </label>
+                                    <select
+                                        v-model="formNuevo.branch_id"
+                                        class="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                                        required
+                                    >
+                                        <option :value="null">Selecciona una sucursal</option>
+                                        <option v-for="branch in branches" :key="branch.id" :value="branch.id">
+                                            {{ branch.name }} ({{ branch.code }})
+                                        </option>
+                                    </select>
+                                </div>
+
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                         Producto

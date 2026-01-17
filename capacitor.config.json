@@ -1,0 +1,18 @@
+{
+  "appId": "com.totoro.tlapaleria",
+  "appName": "Ferreteria TOTORO",
+  "webDir": "public",
+  "server": {
+    "url": "http://localhost:8000",
+    "cleartext": true,
+    "androidScheme": "http"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#1e40af",
+      "showSpinner": true,
+      "spinnerColor": "#ffffff"
+    }
+  }
+}

@@ -1,12 +1,21 @@
 <?php
 namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Supplier extends Model
 {
-    protected $fillable = ['name', 'contact_name', 'phone', 'email', 'address'];
+    use SoftDeletes, LogsActivity;
+
+    protected $fillable = ['name', 'contact_name', 'phone', 'email', 'address', 'active'];
+
+    protected $casts = [
+        'active' => 'boolean',
+    ];
 
     public function products(): HasMany
     {
@@ -26,5 +35,25 @@ class Supplier extends Model
     public function purchases(): HasMany
     {
         return $this->hasMany(Purchase::class);
+    }
+
+    /**
+     * Scope para obtener solo proveedores activos
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('active', true);
+    }
+
+    /**
+     * Configuración de Activity Log
+     */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'contact_name', 'phone', 'email', 'address', 'active'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName) => "Proveedor {$eventName}");
     }
 }
