@@ -51,7 +51,7 @@ return new class extends Migration
         // Sales - agregar soft deletes y status (solo si no existen)
         Schema::table('sales', function (Blueprint $table) {
             if (!Schema::hasColumn('sales', 'status')) {
-                $table->enum('status', ['completed', 'cancelled', 'pending'])->default('completed')->after('user_id');
+                $table->string('status', 20)->default('completed')->after('user_id');
             }
             if (!Schema::hasColumn('sales', 'deleted_at')) {
                 $table->softDeletes()->after('updated_at');
@@ -61,7 +61,7 @@ return new class extends Migration
         // Purchases - agregar soft deletes y status (solo si no existen)
         Schema::table('purchases', function (Blueprint $table) {
             if (!Schema::hasColumn('purchases', 'status')) {
-                $table->enum('status', ['completed', 'cancelled', 'pending'])->default('completed')->after('user_id');
+                $table->string('status', 20)->default('completed')->after('user_id');
             }
             if (!Schema::hasColumn('purchases', 'deleted_at')) {
                 $table->softDeletes()->after('updated_at');

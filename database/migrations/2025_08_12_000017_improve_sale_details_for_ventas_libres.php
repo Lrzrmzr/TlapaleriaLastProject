@@ -17,7 +17,7 @@ return new class extends Migration
 
             // Agregar campo tipo_venta para diferenciar
             if (!Schema::hasColumn('sale_details', 'tipo_venta')) {
-                $table->enum('tipo_venta', ['catalogo', 'libre'])->default('catalogo')->after('sale_id');
+                $table->string('tipo_venta', 20)->default('catalogo')->after('product_id');
             }
 
             // descripcion ya existe de la migración anterior, pero aseguramos que esté

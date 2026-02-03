@@ -8,7 +8,7 @@ return new class extends Migration {
         Schema::create('faltantes', function (Blueprint $table) {
             $table->id();
             $table->string('descripcion', 255);
-            $table->enum('pedido', ['GENERAL', 'TRUPER']);
+            $table->string('pedido', 20)->default('GENERAL');
             $table->boolean('confirmado')->default(0);
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->timestamps();

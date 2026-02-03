@@ -10,9 +10,11 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        Schema::table('faltantes', function (Blueprint $table) {
-            $table->boolean('confirmado')->default(0);
-        });
+        if (!Schema::hasColumn('faltantes', 'confirmado')) {
+            Schema::table('faltantes', function (Blueprint $table) {
+                $table->boolean('confirmado')->default(0);
+            });
+        }
     }
 
     /**
