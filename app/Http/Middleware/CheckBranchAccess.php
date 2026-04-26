@@ -30,11 +30,18 @@ class CheckBranchAccess
                 ->withErrors(['error' => 'Los clientes no tienen acceso al sistema de administración. Este rol está reservado para futuras ventas en línea.']);
         }
 
-        // Root (ID=1) tiene acceso a todo sin necesidad de sucursal
+        // Root (ID=1) tiene acceso a todo sin necesidad de sucursal ni tenant
         if ($user->isRoot()) {
             $request->merge(['user_branch_id' => null]); // null = ve todas las sucursales
             $request->merge(['is_root' => true]);
+            $request->merge(['user_tenant_id' => null]); // null = ve todos los tenants
             return $next($request);
+        }
+
+        // Usuarios no-root deben pertenecer a un tenant activo
+        if (!$user->tenant_id || !$user->tenant || !$user->tenant->isActive()) {
+            return redirect()->route('login')
+                ->withErrors(['error' => 'Tu empresa no tiene una suscripción activa. Contacta al administrador.']);
         }
 
         // Administradores (ID=2) y Trabajadores (ID=3) NECESITAN sucursal asignada
@@ -44,8 +51,15 @@ class CheckBranchAccess
                 ->withErrors(['error' => 'No tienes una sucursal asignada. Contacta al administrador para que te asigne una sucursal.']);
         }
 
-        // Agregar la sucursal del usuario al request para uso posterior
+        // Validar que la sucursal del usuario pertenece al mismo tenant
+        if ($user->branch && $user->branch->tenant_id !== $user->tenant_id) {
+            return redirect()->route('login')
+                ->withErrors(['error' => 'Acceso inválido: sucursal no pertenece a tu empresa.']);
+        }
+
+        // Agregar la sucursal y tenant del usuario al request para uso posterior
         $request->merge(['user_branch_id' => $user->branch_id]);
+        $request->merge(['user_tenant_id' => $user->tenant_id]);
         $request->merge(['is_root' => false]);
 
         return $next($request);

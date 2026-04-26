@@ -103,6 +103,23 @@ const menuSections = computed(() => [
         ],
     },
     {
+        title: 'Crédito',
+        items: [
+            {
+                name: 'Cuentas por Pagar',
+                route: 'cuentas-por-pagar.index',
+                icon: 'M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5',
+                active: route().current('cuentas-por-pagar.*'),
+            },
+            {
+                name: 'Cuentas por Cobrar',
+                route: 'cuentas-por-cobrar.index',
+                icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z',
+                active: route().current('cuentas-por-cobrar.*'),
+            },
+        ],
+    },
+    {
         title: 'Administración',
         items: [
             {
@@ -126,6 +143,18 @@ const menuSections = computed(() => [
             },
         ].filter(item => item.visible !== false),
     },
+    // Sección visible solo para root (Super Admin)
+    ...(isRoot.value ? [{
+        title: 'Super Admin',
+        items: [
+            {
+                name: 'Empresas',
+                route: 'admin.tenants.index',
+                icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
+                active: route().current('admin.tenants.*'),
+            },
+        ],
+    }] : []),
 ]);
 
 const toggleSidebar = () => {

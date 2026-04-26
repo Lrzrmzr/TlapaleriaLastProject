@@ -4,18 +4,25 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\Tenant;
+use App\Traits\BelongsToTenant;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class Purchase extends Model
 {
-    use SoftDeletes, LogsActivity;
+    use SoftDeletes, LogsActivity, BelongsToTenant;
 
-    protected $fillable = ['supplier_id', 'user_id', 'branch_id', 'total', 'status'];
+    protected $fillable = ['supplier_id', 'user_id', 'branch_id', 'total', 'status', 'tenant_id'];
 
     protected $casts = [
         'total' => 'decimal:2',
     ];
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     public function supplier(): BelongsTo
     {

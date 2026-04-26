@@ -3,19 +3,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Tenant;
+use App\Traits\BelongsToTenant;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class Gasto extends Model
 {
-    use SoftDeletes, LogsActivity;
+    use SoftDeletes, LogsActivity, BelongsToTenant;
 
-    protected $fillable = ['descripcion', 'user_id', 'branch_id', 'monto', 'active'];
+    protected $fillable = ['descripcion', 'user_id', 'branch_id', 'monto', 'active', 'tenant_id'];
 
     protected $casts = [
         'monto' => 'decimal:2',
         'active' => 'boolean',
     ];
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     public function user(): BelongsTo
     {

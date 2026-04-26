@@ -3,22 +3,43 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\CuentaPorCobrar;
+use App\Models\Tenant;
+use App\Traits\BelongsToTenant;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class Customer extends Model
 {
-    use SoftDeletes, LogsActivity;
+    use SoftDeletes, LogsActivity, BelongsToTenant;
 
-    protected $fillable = ['name', 'phone', 'email', 'address', 'active'];
+    protected $fillable = ['name', 'phone', 'email', 'address', 'active', 'tenant_id'];
 
     protected $casts = [
         'active' => 'boolean',
     ];
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
     public function sales(): HasMany
     {
         return $this->hasMany(Sale::class);
+    }
+
+    public function cuentasPorCobrar(): HasMany
+    {
+        return $this->hasMany(CuentaPorCobrar::class);
+    }
+
+    public function saldoPendiente(): float
+    {
+        return (float) $this->cuentasPorCobrar()
+            ->whereIn('status', ['pendiente', 'parcial'])
+            ->sum('saldo');
     }
 
     /**

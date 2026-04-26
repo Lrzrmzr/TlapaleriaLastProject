@@ -5,20 +5,27 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Tenant;
+use App\Traits\BelongsToTenant;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class Product extends Model
 {
-    use SoftDeletes, LogsActivity;
+    use SoftDeletes, LogsActivity, BelongsToTenant;
 
-    protected $fillable = ['name', 'description', 'barcode', 'price', 'cost', 'supplier_id', 'active'];
+    protected $fillable = ['name', 'description', 'barcode', 'price', 'cost', 'supplier_id', 'active', 'tenant_id'];
 
     protected $casts = [
         'price' => 'decimal:2',
         'cost' => 'decimal:2',
         'active' => 'boolean',
     ];
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     public function supplier(): BelongsTo
     {

@@ -7,6 +7,9 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
+    ->withProviders([
+        App\Providers\TenancyServiceProvider::class,
+    ])
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
@@ -14,24 +17,30 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // ResolveTenant corre antes que auth en web y API
+        $middleware->web(prepend: [
+            \App\Http\Middleware\ResolveTenant::class,
+        ]);
+
+        $middleware->api(prepend: [
+            \App\Http\Middleware\ResolveTenant::class,
+            \Illuminate\Http\Middleware\ValidatePostSize::class,
+        ]);
+
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         $middleware->alias([
-            'role' => \App\Http\Middleware\CheckRole::class,
-            'check.branch' => \App\Http\Middleware\CheckBranchAccess::class,
+            'role'          => \App\Http\Middleware\CheckRole::class,
+            'check.branch'  => \App\Http\Middleware\CheckBranchAccess::class,
+            'resolve.tenant'=> \App\Http\Middleware\ResolveTenant::class,
         ]);
 
         // Excluir /api/login de la verificación CSRF
         $middleware->validateCsrfTokens(except: [
             'api/login',
-        ]);
-
-        // Asegurar que las rutas API siempre devuelvan JSON
-        $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\ValidatePostSize::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

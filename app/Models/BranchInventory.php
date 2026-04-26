@@ -6,12 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Tenant;
+use App\Traits\BelongsToTenant;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class BranchInventory extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, SoftDeletes, LogsActivity, BelongsToTenant;
 
     protected $table = 'branch_inventory';
 
@@ -23,6 +25,7 @@ class BranchInventory extends Model
         'max_stock',
         'cost',
         'active',
+        'tenant_id',
     ];
 
     protected $casts = [
@@ -36,6 +39,11 @@ class BranchInventory extends Model
     /**
      * Relación con la sucursal
      */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);

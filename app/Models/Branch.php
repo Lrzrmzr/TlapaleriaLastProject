@@ -6,13 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Tenant;
+use App\Traits\BelongsToTenant;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
 
 class Branch extends Model
 {
-    use HasFactory, SoftDeletes, LogsActivity;
+    use HasFactory, SoftDeletes, LogsActivity, BelongsToTenant;
 
     protected $fillable = [
         'name',
@@ -24,12 +27,21 @@ class Branch extends Model
         'active',
         'is_main',
         'notes',
+        'tenant_id',
     ];
 
     protected $casts = [
         'active' => 'boolean',
         'is_main' => 'boolean',
     ];
+
+    /**
+     * Relación con el tenant (empresa)
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 
     /**
      * Scope para obtener solo sucursales activas

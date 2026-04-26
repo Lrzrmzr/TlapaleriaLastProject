@@ -93,6 +93,22 @@ Route::middleware(['auth', 'check.branch'])->group(function () {
     Route::put('/gastos/{gasto}', [\App\Http\Controllers\GastoController::class, 'update'])->name('gastos.update');
     Route::delete('/gastos/{gasto}', [\App\Http\Controllers\GastoController::class, 'destroy'])->name('gastos.destroy');
 
+    // Cuentas por Pagar
+    Route::get('/cuentas-por-pagar', [\App\Http\Controllers\CuentaPorPagarController::class, 'index'])->name('cuentas-por-pagar.index');
+    Route::post('/cuentas-por-pagar', [\App\Http\Controllers\CuentaPorPagarController::class, 'store'])->name('cuentas-por-pagar.store');
+    Route::put('/cuentas-por-pagar/{cuentaPorPagar}', [\App\Http\Controllers\CuentaPorPagarController::class, 'update'])->name('cuentas-por-pagar.update');
+    Route::delete('/cuentas-por-pagar/{cuentaPorPagar}', [\App\Http\Controllers\CuentaPorPagarController::class, 'destroy'])->name('cuentas-por-pagar.destroy');
+    Route::post('/cuentas-por-pagar/{cuentaPorPagar}/pagos', [\App\Http\Controllers\CuentaPorPagarController::class, 'storePago'])->name('cuentas-por-pagar.pagos.store');
+    Route::delete('/cuentas-por-pagar/pagos/{pago}', [\App\Http\Controllers\CuentaPorPagarController::class, 'destroyPago'])->name('cuentas-por-pagar.pagos.destroy');
+
+    // Cuentas por Cobrar
+    Route::get('/cuentas-por-cobrar', [\App\Http\Controllers\CuentaPorCobrarController::class, 'index'])->name('cuentas-por-cobrar.index');
+    Route::post('/cuentas-por-cobrar', [\App\Http\Controllers\CuentaPorCobrarController::class, 'store'])->name('cuentas-por-cobrar.store');
+    Route::put('/cuentas-por-cobrar/{cuentaPorCobrar}', [\App\Http\Controllers\CuentaPorCobrarController::class, 'update'])->name('cuentas-por-cobrar.update');
+    Route::delete('/cuentas-por-cobrar/{cuentaPorCobrar}', [\App\Http\Controllers\CuentaPorCobrarController::class, 'destroy'])->name('cuentas-por-cobrar.destroy');
+    Route::post('/cuentas-por-cobrar/{cuentaPorCobrar}/cobros', [\App\Http\Controllers\CuentaPorCobrarController::class, 'storeCobro'])->name('cuentas-por-cobrar.cobros.store');
+    Route::delete('/cuentas-por-cobrar/cobros/{cobro}', [\App\Http\Controllers\CuentaPorCobrarController::class, 'destroyCobro'])->name('cuentas-por-cobrar.cobros.destroy');
+
     // Settings (Root only)
     Route::get('/settings', [\App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
     Route::post('/settings/update', [\App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
@@ -102,5 +118,18 @@ Route::middleware(['auth', 'check.branch'])->group(function () {
     Route::get('/auditoria', [\App\Http\Controllers\AuditController::class, 'index'])->name('auditoria.index');
     Route::get('/auditoria/{id}', [\App\Http\Controllers\AuditController::class, 'show'])->name('auditoria.show');
 });
+
+// ─── Super Admin — Solo root, sin filtro de sucursal ─────────────────────────
+Route::middleware(['auth', 'role:root'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('/tenants', [\App\Http\Controllers\Admin\TenantController::class, 'index'])->name('tenants.index');
+        Route::post('/tenants', [\App\Http\Controllers\Admin\TenantController::class, 'store'])->name('tenants.store');
+        Route::put('/tenants/{id}', [\App\Http\Controllers\Admin\TenantController::class, 'update'])->name('tenants.update');
+        Route::post('/tenants/{id}/suspend', [\App\Http\Controllers\Admin\TenantController::class, 'suspend'])->name('tenants.suspend');
+        Route::post('/tenants/{id}/impersonate', [\App\Http\Controllers\Admin\TenantController::class, 'impersonate'])->name('tenants.impersonate');
+        Route::post('/stop-impersonating', [\App\Http\Controllers\Admin\TenantController::class, 'stopImpersonating'])->name('stop-impersonating');
+    });
 
 require __DIR__.'/auth.php';
